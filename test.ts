@@ -10,3 +10,7 @@ basic.pause(1000)
 for (let index = 0; index <= 100; index += 5) {
     OledSky3D.liveGraph("MERENI", index, 0, 100)
 }
+basic.pause(1000)
+for (let index = 0; index <= 100; index += 5) {
+    OledSky3D.plotGraph("PRUBEH", index, 0, 100, OledSky3D.GraphScale.Automatic)
+}

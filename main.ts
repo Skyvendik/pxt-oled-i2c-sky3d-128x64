@@ -7,12 +7,24 @@
 //% color="#1565C0" icon="\uf26c" block="Oled I2C Sky3D 128x64"
 //% groups="['Základní', 'Text', 'Grafika', 'Nastavení']"
 namespace OledSky3D {
+    export enum GraphScale {
+        //% block="automatické"
+        Automatic,
+        //% block="pevné"
+        Fixed
+    }
+
     let address = 60
     let screen = pins.createBuffer(1024)
     let started = false
     let graphStarted = false
     let graphTitle = ""
     let graphLastY = 63
+    let plotSamples: number[] = []
+    let plotTitle = ""
+    let plotScale = GraphScale.Automatic
+    let plotMinimum = 0
+    let plotMaximum = 1023
 
     function writeCommand(command: number): void {
         const b = pins.createBuffer(2)
@@ -61,6 +73,8 @@ namespace OledSky3D {
         screen.fill(0)
         graphStarted = false
         graphTitle = ""
+        plotSamples = []
+        plotTitle = ""
         update()
     }
 
@@ -354,11 +368,11 @@ namespace OledSky3D {
     }
 
     /**
-     * Živý posuvný graf pro potenciometr, světlo, zvuk, sílu nebo napětí.
-     * Blok opakovaně volejte ve smyčce; každý nový vzorek přibude zprava.
+     * Živý celoobrazovkový pruh pro potenciometr, světlo, zvuk,
+     * sílu nebo napětí. Modrá plocha narůstá zleva doprava.
      */
     //% blockId=oled_sky3d_live_graph
-    //% block="OLED živý graf název %title|hodnota %value|minimum %minimum|maximum %maximum"
+    //% block="OLED živý pruh název %title|hodnota %value|minimum %minimum|maximum %maximum"
     //% title.defl="MEŘENÍ" value.defl=0 minimum.defl=0 maximum.defl=1023
     //% inlineInputMode=external
     //% group="Grafika" weight=110
@@ -366,7 +380,7 @@ namespace OledSky3D {
         minimum: number = 0, maximum: number = 1023): void {
         if (maximum <= minimum) maximum = minimum + 1
 
-        // Nový graf nebo změna nadpisu vymaže předchozí obsah.
+        // Nový pruh nebo změna nadpisu připraví žluté záhlaví.
         if (!graphStarted || graphTitle != title) {
             screen.fill(0)
             let titleScale = 2
@@ -374,26 +388,89 @@ namespace OledSky3D {
             drawText(title, centeredX(title, titleScale), 2, titleScale)
             graphStarted = true
             graphTitle = title
-            graphLastY = 63
         }
 
-        // Posun pouze modré části o jeden pixel doleva.
-        for (let x = 0; x < 127; x++) {
-            for (let y = 16; y < 64; y++) {
-                setPixel(x, y, getPixel(x + 1, y))
+        // Celé fyzicky modré pásmo nejprve vymažeme.
+        for (let x = 0; x < 128; x++) {
+            for (let y = 16; y < 64; y++) setPixel(x, y, false)
+        }
+        const ratio = Math.constrain((value - minimum) / (maximum - minimum), 0, 1)
+        const filledColumns = Math.round(ratio * 128)
+
+        // Silný pruh zabírá plnou výšku modré části: y = 16 až 63.
+        for (let x = 0; x < filledColumns; x++) {
+            for (let y = 16; y < 64; y++) setPixel(x, y, true)
+        }
+        update()
+    }
+
+    /**
+     * Vykresluje časový průběh hodnot zleva doprava. Po zaplnění 128 bodů
+     * se graf začne posouvat. Automatické měřítko využije celou výšku.
+     */
+    //% blockId=oled_sky3d_plot_graph
+    //% block="OLED průběhový graf název %title|hodnota %value|minimum %minimum|maximum %maximum|měřítko %scale"
+    //% title.defl="PRŮBĚH" value.defl=0 minimum.defl=0 maximum.defl=1023
+    //% scale.defl=GraphScale.Automatic
+    //% inlineInputMode=external
+    //% group="Grafika" weight=105
+    export function plotGraph(title: string, value: number, minimum: number = 0,
+        maximum: number = 1023, scale: GraphScale = GraphScale.Automatic): void {
+        if (maximum <= minimum) maximum = minimum + 1
+
+        // Při změně konfigurace začíná nový průběh od levého okraje.
+        if (plotTitle != title || plotScale != scale ||
+            plotMinimum != minimum || plotMaximum != maximum) {
+            plotSamples = []
+            plotTitle = title
+            plotScale = scale
+            plotMinimum = minimum
+            plotMaximum = maximum
+        }
+
+        if (plotSamples.length < 128) {
+            plotSamples.push(value)
+        } else {
+            for (let i = 0; i < 127; i++) plotSamples[i] = plotSamples[i + 1]
+            plotSamples[127] = value
+        }
+
+        let rangeMin = minimum
+        let rangeMax = maximum
+        if (scale == GraphScale.Automatic && plotSamples.length > 0) {
+            rangeMin = plotSamples[0]
+            rangeMax = plotSamples[0]
+            for (let sample of plotSamples) {
+                if (sample < rangeMin) rangeMin = sample
+                if (sample > rangeMax) rangeMax = sample
+            }
+            // Konstantní hodnota se vykreslí uprostřed modré plochy.
+            if (rangeMax == rangeMin) {
+                rangeMin -= 1
+                rangeMax += 1
             }
         }
-        for (let y = 16; y < 64; y++) setPixel(127, y, false)
 
-        const ratio = Math.constrain((value - minimum) / (maximum - minimum), 0, 1)
-        const newY = 63 - Math.round(ratio * 47)
+        screen.fill(0)
+        let titleScale = 2
+        if (title.length * 8 > 128) titleScale = 1
+        drawText(title, centeredX(title, titleScale), 2, titleScale)
 
-        // Spojení předchozího a nového vzorku zachytí i prudké špičky.
-        const fromY = Math.min(graphLastY, newY)
-        const toY = Math.max(graphLastY, newY)
-        setPixel(126, graphLastY, true)
-        for (let y = fromY; y <= toY; y++) setPixel(127, y, true)
-        graphLastY = newY
+        let previousY = 40
+        for (let x = 0; x < plotSamples.length; x++) {
+            const ratio = Math.constrain(
+                (plotSamples[x] - rangeMin) / (rangeMax - rangeMin), 0, 1)
+            const y = 63 - Math.round(ratio * 47)
+            setPixel(x, y, true)
+            if (x > 0) {
+                const fromY = Math.min(previousY, y)
+                const toY = Math.max(previousY, y)
+                for (let lineY = fromY; lineY <= toY; lineY++) {
+                    setPixel(x, lineY, true)
+                }
+            }
+            previousY = y
+        }
         update()
     }
 
