@@ -10,6 +10,9 @@ namespace OledSky3D {
     let address = 60
     let screen = pins.createBuffer(1024)
     let started = false
+    let graphStarted = false
+    let graphTitle = ""
+    let graphLastY = 63
 
     function writeCommand(command: number): void {
         const b = pins.createBuffer(2)
@@ -56,6 +59,8 @@ namespace OledSky3D {
     //% group="Základní" weight=90
     export function clear(): void {
         screen.fill(0)
+        graphStarted = false
+        graphTitle = ""
         update()
     }
 
@@ -105,6 +110,13 @@ namespace OledSky3D {
         else screen[index] &= ~mask
     }
 
+    function getPixel(x: number, y: number): boolean {
+        if (x < 0 || x > 127 || y < 0 || y > 63) return false
+        const index = x + (y >> 3) * 128
+        const mask = 1 << (y & 7)
+        return (screen[index] & mask) != 0
+    }
+
     function glyph(ch: string): string[] {
         if (ch == "0") return ["111", "101", "101", "101", "111"]
         if (ch == "1") return ["010", "110", "010", "010", "111"]
@@ -146,6 +158,20 @@ namespace OledSky3D {
         if (ch == "Y") return ["101", "101", "010", "010", "010"]
         if (ch == "Z") return ["111", "001", "010", "100", "111"]
         if (ch == "%") return ["101", "001", "010", "100", "101"]
+        // České znaky se na malém 3×5 fontu zobrazují jako základní písmeno.
+        if (ch == "Á") return glyph("A")
+        if (ch == "Č") return glyph("C")
+        if (ch == "Ď") return glyph("D")
+        if (ch == "É" || ch == "Ě") return glyph("E")
+        if (ch == "Í") return glyph("I")
+        if (ch == "Ň") return glyph("N")
+        if (ch == "Ó") return glyph("O")
+        if (ch == "Ř") return glyph("R")
+        if (ch == "Š") return glyph("S")
+        if (ch == "Ť") return glyph("T")
+        if (ch == "Ú" || ch == "Ů") return glyph("U")
+        if (ch == "Ý") return glyph("Y")
+        if (ch == "Ž") return glyph("Z")
         return ["000", "000", "000", "000", "000"]
     }
 
@@ -324,6 +350,50 @@ namespace OledSky3D {
         const barWidth = 127 - barX
         drawSmallBar(barX, 21, barWidth, 14, value1, maximum1)
         drawSmallBar(barX, 45, barWidth, 14, value2, maximum2)
+        update()
+    }
+
+    /**
+     * Živý posuvný graf pro potenciometr, světlo, zvuk, sílu nebo napětí.
+     * Blok opakovaně volejte ve smyčce; každý nový vzorek přibude zprava.
+     */
+    //% blockId=oled_sky3d_live_graph
+    //% block="OLED živý graf název %title|hodnota %value|minimum %minimum|maximum %maximum"
+    //% title.defl="MEŘENÍ" value.defl=0 minimum.defl=0 maximum.defl=1023
+    //% inlineInputMode=external
+    //% group="Grafika" weight=110
+    export function liveGraph(title: string, value: number,
+        minimum: number = 0, maximum: number = 1023): void {
+        if (maximum <= minimum) maximum = minimum + 1
+
+        // Nový graf nebo změna nadpisu vymaže předchozí obsah.
+        if (!graphStarted || graphTitle != title) {
+            screen.fill(0)
+            let titleScale = 2
+            if (title.length * 8 > 128) titleScale = 1
+            drawText(title, centeredX(title, titleScale), 2, titleScale)
+            graphStarted = true
+            graphTitle = title
+            graphLastY = 63
+        }
+
+        // Posun pouze modré části o jeden pixel doleva.
+        for (let x = 0; x < 127; x++) {
+            for (let y = 16; y < 64; y++) {
+                setPixel(x, y, getPixel(x + 1, y))
+            }
+        }
+        for (let y = 16; y < 64; y++) setPixel(127, y, false)
+
+        const ratio = Math.constrain((value - minimum) / (maximum - minimum), 0, 1)
+        const newY = 63 - Math.round(ratio * 47)
+
+        // Spojení předchozího a nového vzorku zachytí i prudké špičky.
+        const fromY = Math.min(graphLastY, newY)
+        const toY = Math.max(graphLastY, newY)
+        setPixel(126, graphLastY, true)
+        for (let y = fromY; y <= toY; y++) setPixel(127, y, true)
+        graphLastY = newY
         update()
     }
 

@@ -40,6 +40,11 @@ Parametr `hodnoty od x` určuje vodorovnou pozici obou hodnot. Blok
 `OLED 2 pruhy` zobrazuje dva samostatné ukazatele; parametr `pruhy od x`
 určuje, kde začínají. Všechny tři názvy lze měnit přímo v blocích.
 
+Blok `OLED živý graf` využívá celé modré pásmo jako posuvný graf. Při každém
+volání přidá zprava nový vzorek a starší hodnoty posune doleva. Parametry
+`minimum` a `maximum` určují měřicí rozsah. Pro analogový vstup micro:bitu
+se obvykle používá rozsah 0 až 1023.
+
 ## Licence
 
 MIT
