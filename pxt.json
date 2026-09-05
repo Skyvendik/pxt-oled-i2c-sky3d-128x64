@@ -1,6 +1,6 @@
 {
   "name": "oled-i2c-sky3d-128x64",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "OLED SSD1306 I2C 128x64 (výchozí adresa 60/0x3C) pro micro:bit",
   "license": "MIT",
   "dependencies": {

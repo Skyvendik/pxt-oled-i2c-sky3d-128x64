@@ -237,6 +237,96 @@ namespace OledSky3D {
         update()
     }
 
+    /**
+     * Společný žlutý nadpis a dvě modré veličiny. Každá hodnota je
+     * vykreslena na stejném řádku od nastavitelné souřadnice X.
+     */
+    //% blockId=oled_sky3d_two_measurements
+    //% block="OLED 2 měření nadpis %title|veličina 1 %name1|hodnota 1 %value1|veličina 2 %name2|hodnota 2 %value2|hodnoty od x %valueX"
+    //% title.defl="MEASUREMENT" name1.defl="TEPLOTA" value1.defl=20 name2.defl="VLHKOST" value2.defl=50
+    //% valueX.defl=76 valueX.min=40 valueX.max=110
+    //% inlineInputMode=external
+    //% group="Text" weight=95
+    export function showTwoMeasurements(title: string, name1: string, value1: number,
+        name2: string, value2: number, valueX: number = 76): void {
+        screen.fill(0)
+
+        let titleScale = 2
+        if (title.length * 8 > 128) titleScale = 1
+        drawText(title, centeredX(title, titleScale), 2, titleScale)
+
+        valueX = Math.constrain(valueX, 40, 110)
+        let labelScale1 = 2
+        let labelScale2 = 2
+        if (name1.length * 8 >= valueX) labelScale1 = 1
+        if (name2.length * 8 >= valueX) labelScale2 = 1
+
+        const text1 = "" + value1
+        const text2 = "" + value2
+        let valueScale1 = Math.idiv(128 - valueX, Math.max(1, text1.length * 4))
+        let valueScale2 = Math.idiv(128 - valueX, Math.max(1, text2.length * 4))
+        valueScale1 = Math.constrain(valueScale1, 1, 3)
+        valueScale2 = Math.constrain(valueScale2, 1, 3)
+
+        drawText(name1, 1, 22, labelScale1)
+        drawText(text1, valueX, 20, valueScale1)
+        drawText(name2, 1, 46, labelScale2)
+        drawText(text2, valueX, 44, valueScale2)
+        update()
+    }
+
+    function drawSmallBar(left: number, top: number, width: number,
+        height: number, value: number, maximum: number): void {
+        let ratio = 0
+        if (maximum > 0) ratio = Math.constrain(value / maximum, 0, 1)
+        const fillWidth = Math.round((width - 4) * ratio)
+
+        for (let x = left; x < left + width; x++) {
+            setPixel(x, top, true)
+            setPixel(x, top + height - 1, true)
+        }
+        for (let y = top; y < top + height; y++) {
+            setPixel(left, y, true)
+            setPixel(left + width - 1, y, true)
+        }
+        for (let x = 0; x < fillWidth; x++) {
+            for (let y = 0; y < height - 4; y++) {
+                setPixel(left + 2 + x, top + 2 + y, true)
+            }
+        }
+    }
+
+    /** Společný žlutý nadpis a dva samostatné modré ukazatele. */
+    //% blockId=oled_sky3d_two_bars
+    //% block="OLED 2 pruhy nadpis %title|veličina 1 %name1|hodnota 1 %value1|max 1 %maximum1|veličina 2 %name2|hodnota 2 %value2|max 2 %maximum2|pruhy od x %barX"
+    //% title.defl="MEASUREMENT" name1.defl="TEPLOTA" value1.defl=20 maximum1.defl=100
+    //% name2.defl="VLHKOST" value2.defl=50 maximum2.defl=100
+    //% barX.defl=48 barX.min=30 barX.max=100
+    //% inlineInputMode=external
+    //% group="Grafika" weight=95
+    export function showTwoBars(title: string, name1: string, value1: number,
+        maximum1: number, name2: string, value2: number, maximum2: number,
+        barX: number = 48): void {
+        screen.fill(0)
+
+        let titleScale = 2
+        if (title.length * 8 > 128) titleScale = 1
+        drawText(title, centeredX(title, titleScale), 2, titleScale)
+
+        barX = Math.constrain(barX, 30, 100)
+        let nameScale1 = 2
+        let nameScale2 = 2
+        if (name1.length * 8 >= barX) nameScale1 = 1
+        if (name2.length * 8 >= barX) nameScale2 = 1
+        drawText(name1, 1, 23, nameScale1)
+        drawText(name2, 1, 47, nameScale2)
+
+        const barWidth = 127 - barX
+        drawSmallBar(barX, 21, barWidth, 14, value1, maximum1)
+        drawSmallBar(barX, 45, barWidth, 14, value2, maximum2)
+        update()
+    }
+
     /** Nastaví kontrast 0 až 255. */
     //% blockId=oled_sky3d_contrast block="nastav kontrast OLED %value"
     //% value.defl=207 value.min=0 value.max=255

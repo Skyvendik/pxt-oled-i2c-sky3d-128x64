@@ -35,6 +35,11 @@ a automaticky zvětšenou hodnotu do spodního pásma. Blok `OLED pruh` použív
 stejné rozdělení; délku pruhu počítá jako `hodnota / maximum`. Opakovaným
 voláním s rostoucí hodnotou pruh narůstá.
 
+Blok `OLED 2 měření` zobrazuje společný nadpis a dva řádky název–hodnota.
+Parametr `hodnoty od x` určuje vodorovnou pozici obou hodnot. Blok
+`OLED 2 pruhy` zobrazuje dva samostatné ukazatele; parametr `pruhy od x`
+určuje, kde začínají. Všechny tři názvy lze měnit přímo v blocích.
+
 ## Licence
 
 MIT
